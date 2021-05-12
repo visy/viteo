@@ -22,8 +22,11 @@ typedef unsigned char  byte;
 typedef unsigned short word;
 typedef unsigned long  dword;
 
-#define SET_MODE  0x00      /* BIOS func to set the video mode. */
-#define VIDEO_INT 0x10      /* the BIOS video interrupt. */
+
+#define SET_MODE  		0x00      /* BIOS func to set the video mode. */
+#define VIDEO_INT 		0x10      /* the BIOS video interrupt. */
+#define VRETRACE  		0x08
+#define INPUT_STATUS_1	0x03da
 
 byte *VGA=(byte*)0xA0000L;
 
@@ -51,7 +54,7 @@ void readyVgaRegs(void)
 {
 	int v;
 	outportb(0x3d4,0x11);
-  v = inportb(0x3d5) & 0x7f;
+	v = inportb(0x3d5) & 0x7f;
 	outportb(0x3d4,0x11);
 	outportb(0x3d5,v);
 }
@@ -116,69 +119,59 @@ byte *buffercol;
 inline void set(int x, int y, int c) 
 {
 	VGA[(y<<8)+x] = c;
+	VGA[(y<<8)+x+1] = c;
+	VGA[(y<<8)+x+2] = c;
+	VGA[(y<<8)+x+3] = c;
+	VGA[(y<<8)+x+4] = c;
+	VGA[(y<<8)+x+5] = c;
+	VGA[(y<<8)+x+6] = c;
+	VGA[(y<<8)+x+7] = c;
 }
 
-byte frame = 0;
+int frame = 0;
 
 long vi = 0;
+
+int modtab[256] = {0};
+int divtab[256] = {0};
 
 void sampleVideo() 
 {
 	int x=0,y=0,x1=0,y1=0;
 
-	VGA[0] = frame;
-
 	for(y=0;y<256;y+=8) {
 		for(x=0;x<256;x+=8) {
 			byte i1 = bufferpix[vi];
-			byte i2 = bufferpix[vi+1];
-			byte i3 = bufferpix[vi+2];
-
 			byte p1 = buffercol[vi];
-			byte p2 = buffercol[vi+1];
-			byte p3 = buffercol[vi+2];
 
-			int x2 = i1%8;
-			int y2 = i1/8;
-			int x3 = i2%8;
-			int y3 = i2/8;
-			int x4 = i3%8;
-			int y4 = i3/8;
+			int x2 = modtab[i1];
+			int y2 = divtab[i1];
 
 			for (y1=0;y1<8;y1++) {
-				for (x1=0;x1<8;x1++) {
-
-					double d1=sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
-					double d2=sqrt((x3-x1)*(x3-x1) + (y3-y1)*(y3-y1));
-		   		  	double d3=sqrt((x4-x1)*(x4-x1) + (y4-y1)*(y4-y1));
-
-					if (d1 < d2 && d1 < d3) {
-						set(x+x1+x2,y+y1+y2,p1);
-					}
-					else if (d2 < d2) {
-						set(x+x1+x3,y+y1+y3,p2);
-					}
-					else {
-						set(x+x1+x4,y+y1+y4,p3);
-					}
-
-				}
+				set(x+x2,y+y1+y2,p1);
 			}
 	
-
-			vi+=3;
+			vi+=1;
 		}
 	}
+
+	if (frame > 337) { frame = 0; vi = 0; }
 }
 
 int main(int argc, char *argv[]) 
 {
+	int ii = 0;
 	FILE *vfile;
-  FILE *cfile;
+	FILE *cfile;
 	long lsize;
 	size_t result;
 
 	char ch;
+
+	for (ii=0;ii<256;ii++) {
+		modtab[ii] = ii % 8;
+		divtab[ii] = ii / 8;
+	}
 	
 	vfile = fopen("vpix.dat","rb");
 	if (vfile == NULL) { 
@@ -187,7 +180,7 @@ int main(int argc, char *argv[])
 
 	fseek(vfile,0,SEEK_END);
 	lsize = ftell(vfile);
-  rewind(vfile);
+	rewind(vfile);
 
 	bufferpix = (byte*) malloc(sizeof(byte)*lsize);
 	if (bufferpix == NULL) { quit("not enough memory\n"); }
@@ -197,14 +190,14 @@ int main(int argc, char *argv[])
 
 	//
 	
-  cfile = fopen("vcol.dat","rb");
+	cfile = fopen("vcol.dat","rb");
 	if (cfile == NULL) { 
 		quit("error opening vcol.dat\n"); 
 	}
 
 	fseek(cfile,0,SEEK_END);
 	lsize = ftell(cfile);
-  rewind(cfile);
+	rewind(cfile);
 
 	buffercol = (byte*) malloc(sizeof(byte)*lsize);
 	if (buffercol == NULL) { quit("not enough memory\n"); }
@@ -215,12 +208,16 @@ int main(int argc, char *argv[])
 	fclose(vfile);
 	fclose(cfile);
 
-  printf("Starting...\n");
+	printf("Starting...\n");
 	set_mode(0x13);
 	set_mode_q();
 
 	while(!kbhit()) {
 		sampleVideo();
+
+	    while ((inp(INPUT_STATUS_1) & VRETRACE));
+	    while (!(inp(INPUT_STATUS_1) & VRETRACE));
+
 		frame++;
 	}
 
