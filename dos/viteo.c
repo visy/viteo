@@ -138,18 +138,19 @@ void sampleVideo()
 			byte p2 = buffercol[vi+1];
 			byte p3 = buffercol[vi+2];
 
+			int x2 = i1%8;
+			int y2 = i1/8;
+			int x3 = i2%8;
+			int y3 = i2/8;
+			int x4 = i3%8;
+			int y4 = i3/8;
+
 			for (y1=0;y1<8;y1++) {
 				for (x1=0;x1<8;x1++) {
-					int x2 = i1%8;
-					int y2 = i1/8;
-					int x3 = i2%8;
-					int y3 = i2/8;
-					int x4 = i3%8;
-					int y4 = i3/8;
 
 					double d1=sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
 					double d2=sqrt((x3-x1)*(x3-x1) + (y3-y1)*(y3-y1));
-				  double d3=sqrt((x4-x1)*(x4-x1) + (y4-y1)*(y4-y1));
+		   		  	double d3=sqrt((x4-x1)*(x4-x1) + (y4-y1)*(y4-y1));
 
 					if (d1 < d2 && d1 < d3) {
 						set(x+x1+x2,y+y1+y2,p1);
