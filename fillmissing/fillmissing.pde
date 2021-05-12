@@ -137,15 +137,15 @@ void sampleFilled() {
       color p2 = getVGAColor(colortab[i+1]); 
       color p3 = getVGAColor(colortab[i+2]); 
       
+      int x2 = i1%sqs;
+      int y2 = i1/sqs;
+      int x3 = i2%sqs;
+      int y3 = i2/sqs;
+      int x4 = i3%sqs;
+      int y4 = i3/sqs;
+
       for(int y1 = 0; y1 < sqs;y1+=1) {
         for(int x1 = 0; x1 < sqs;x1+=1) {
-
-          int x2 = i1%sqs;
-          int y2 = i1/sqs;
-          int x3 = i2%sqs;
-          int y3 = i2/sqs;
-          int x4 = i3%sqs;
-          int y4 = i3/sqs;
 
           int d1=(int)Math.sqrt((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));  
           int d2=(int)Math.sqrt((x3-x1)*(x3-x1) + (y3-y1)*(y3-y1));  
