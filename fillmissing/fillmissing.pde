@@ -37,8 +37,8 @@ int[] vgacolors_RGB = {
 };
 
 static int framesize = 256*4*4; 
-int truepixsize = 0;
-int truecolsize = 0;
+int truepixsize = 2;
+int truecolsize = 2;
 
 int[] colortab = new int[framesize];
 int[] sparsepixels = new int[framesize];
@@ -136,14 +136,12 @@ void sampleSparse() {
   //  xs++;
   if (xs > 4) xs = 0;
 
-  int first = 1;
   color prevp1 = color(0, 0, 0);
-  ; 
-
+  int skippedtotal = 0;
   for (y = 0; y < 256; y+=sqs) {
     for (x = 0; x < 256; x+=sqs) {
 
-      IntList il = IntList.fromRange(0, 36);
+      IntList il = IntList.fromRange(0, 64);
       il.shuffle(this);
 
       int i1 = il.get(0);
@@ -162,11 +160,13 @@ void sampleSparse() {
         if (skips > 0) {
           pixi++;
           coli++;
+          skippedtotal+=skips;
         }
         skips = 0;
       }
 
-      if (skips > 254) {
+      if (skips > 128) {
+        skippedtotal+=skips;
         skips = 0;
         pixi++;
         coli++;
@@ -205,8 +205,9 @@ void sampleSparse() {
     }
   }
 
-  truecolsize = coli;
-  truepixsize = pixi;
+  truecolsize = coli+1;
+  truepixsize = pixi+1;
+  
 }
 
 boolean sampled = false;
@@ -222,29 +223,28 @@ void sampleFilled() {
   int i1 = 0;
   for (y = 0; y < 256; y+=sqs) {
     for (x = 0; x < 256; x+=sqs) {
-
-      i1 = sparsepixels[pixi];
+      i1 = pix[pixi] & 0xFF;
 
       if (i1 == 255) {
         pixi++;
-        skips = sparsepixels[pixi];
-        runcolor = colortab[coli];
+        skips = pix[pixi] & 0xFF;
+        runcolor = cols[coli] & 0xFF;
       }
 
       color p1 = color(0, 0, 0);
 
       if (skips > 0) {
-        IntList il = IntList.fromRange(0, 36);
+        IntList il = IntList.fromRange(0, 64);
         il.shuffle(this);
 
-        i1 = il.get(0);
+        i1 = (byte)il.get(0);
 
         p1 = getVGAColor(runcolor);
       } 
 
 
       if (skips == 0) {
-        p1 = getVGAColor(colortab[coli]);
+        p1 = getVGAColor(cols[coli] & 0xFF);
         coli++;
         pixi++;
       }
@@ -333,9 +333,14 @@ void setup() {
 int xsd = 0;
 int ff = 0;
 
-void dumpFrameData() {
   byte[] pix = new byte[truepixsize];
   byte[] cols = new byte[truecolsize];
+
+void dumpFrameData() {
+  pix = null;
+  cols = null;
+  pix = new byte[truepixsize];
+  cols = new byte[truecolsize];
 
   for (int i=0; i<truepixsize; i++) {
     pix[i] = (byte)sparsepixels[i];
@@ -378,6 +383,13 @@ void draw() {
   sampleSparse();
   sparse.endDraw();
 
+  ff++;
+  if (ff >= 0 & ff < 24024) {
+    dumpFrameData();
+  } else if (ff >= 24024) {
+    stop();
+  }
+
 
   filled.beginDraw();
   filled.background(0, 0);
@@ -389,10 +401,4 @@ void draw() {
   tint(255, 255);
   image(filled, 0, 0, 256, 256);
 
-  ff++;
-  if (ff > 0 & ff < 24024) {
-    dumpFrameData();
-  } else if (ff >= 24024) {
-    stop();
-  }
 }

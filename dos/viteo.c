@@ -118,22 +118,78 @@ byte *buffercol;
 
 int frame = 0;
 
-long vi = 0;
+long pixi = 0;
+long coli = 0;
 
 byte modtab[256] = {0};
 byte divtab[256] = {0};
 
+byte a,b,c;
+
+byte randoms[64000] = {0};
+int rx = 0;
+int randr = 0;
+
+void init_rng(byte s1,byte s2,byte s3) //Can also be used to seed the rng with more entropy during use.
+{
+	//XOR new entropy into key state
+	a ^=s1;
+	b ^=s2;
+	c ^=s3;
+
+	rx++;
+	a = (a^c^rx);
+	b = (b+a);
+	c = (c+(b>>1)^a);
+}
+
+byte randomize()
+{
+	rx++;               //x is incremented every round and is not affected by any other variable
+	a = (a^c^rx);       //note the mix of addition and XOR
+	b = (b+a);         //And the use of very few instructions
+	c = (c+(b>>1)^a);  //the right shift is to ensure that high-order bits from b can affect  
+	return(c);          //low order bits of other variables
+}
+
 void sampleVideo() 
 {
-        int x=0,y=0,x1=0,y1=0;
+        int x=0,y=0,x1=0,y1=0,skips=0,x2=0,y2=0;
+        byte runcolor = 0, p1 = 0;
 
-        for(y=0;y<256;y+=8) {
-                for(x=0;x<256;x+=8) {
-                        byte i1 = bufferpix[vi];
-                        byte p1 = buffercol[vi];
+        for(y=0;y<256;y+=6) {
+                for(x=0;x<256;x+=6) {
+                        byte i1 = bufferpix[pixi];
 
-                        byte x2 = modtab[i1];
-                        byte y2 = divtab[i1];
+					    if (i1 == 255) {
+					    	pixi++;
+					    	skips = bufferpix[pixi];
+					        runcolor = buffercol[coli];
+					    }
+
+					    if (skips > 0) {
+					    	i1 = randoms[randr++];
+					    	if (randr > 64000) randr = 0;
+					    	p1 = runcolor;
+					    }
+
+					    if (skips == 0) {
+					    	p1 = buffercol[coli];
+					    	coli++;
+					    	pixi++;
+					    }
+
+					    if (skips > 0) {
+					    	skips--;
+
+					    	if (skips == 0) {
+					    		coli++;
+					    		pixi++;
+					    	}
+					    }
+
+                        x2 = modtab[i1];
+                        y2 = divtab[i1];
 
                         VGA[((y+y1+y2)<<8)+x+x2] = p1;
                         VGA[((y+y1+y2+1)<<8)+x+x2] = p1;
@@ -142,11 +198,10 @@ void sampleVideo()
                         VGA[((y+y1+y2+6)<<8)+x+x2] = p1;
                         VGA[((y+y1+y2+7)<<8)+x+x2] = p1;
 
-                        vi++;
                 }
         }
 
-        if (frame > 10020) { frame = 0; vi = 0; }
+        if (frame > 10020) { frame = 0; pixi = 0; coli = 0; }
 }
 
 int main(int argc, char *argv[]) 
@@ -160,8 +215,15 @@ int main(int argc, char *argv[])
         char ch;
 
         for (ii=0;ii<256;ii++) {
-                modtab[ii] = (byte)(ii % 8);
-                divtab[ii] = (byte)(ii / 8);
+                modtab[ii] = (byte)(ii % 6);
+                divtab[ii] = (byte)(ii / 6);
+        }
+
+
+		init_rng(1,2,3);
+
+        for (ii=0;ii<64000;ii++) {
+        	randoms[ii] = randomize()>>1;
         }
         
         vfile = fopen("vpix.dat","rb");
