@@ -46,7 +46,7 @@ int[] sparsepixels = new int[framesize];
 int[] prevcolortab = new int[framesize];
 
 int xs = 0;
-int sqs = 6;
+int sqs = 8;
 
 float colorDistance(color a, color b) 
 {
@@ -140,8 +140,7 @@ void sampleSparse() {
   int skippedtotal = 0;
   for (y = 0; y < 256; y+=sqs) {
     for (x = 0; x < 256; x+=sqs) {
-
-      IntList il = IntList.fromRange(0, 64);
+      IntList il = IntList.fromRange(0, 254);
       il.shuffle(this);
 
       int i1 = il.get(0);
@@ -165,7 +164,7 @@ void sampleSparse() {
         skips = 0;
       }
 
-      if (skips > 128) {
+      if (skips > 254) {
         skippedtotal+=skips;
         skips = 0;
         pixi++;
@@ -324,7 +323,7 @@ void setup() {
 
   frameRate(24);
 
-  viteo = new Movie(this, "bad3d.mp4");
+  viteo = new Movie(this, "boux.mp4");
   viteo.speed(4.0);
   viteo.play();
 }
@@ -372,8 +371,8 @@ void draw() {
   source.beginDraw();
   source.pushMatrix();
   source.background(0);
-  source.scale(0.4, 0.5);
-  source.image(viteo, 0, 8);
+  source.scale(0.25, 0.35);
+  source.image(viteo, -120, -20);
   source.popMatrix();
   source.endDraw();
 
@@ -384,9 +383,9 @@ void draw() {
   sparse.endDraw();
 
   ff++;
-  if (ff >= 0 & ff < 24024) {
+  if (ff >= 0 & ff < 360) {
     dumpFrameData();
-  } else if (ff >= 24024) {
+  } else if (ff >= 360) {
     stop();
   }
 
