@@ -36,8 +36,10 @@ int[] vgacolors_RGB = {
 0,0,0,0,2,170,20,170,0,0,170,170,170,0,3,170,0,170,170,85,0,170,170,170,85,85,85,85,85,255,85,255,85,85,255,255,255,85,85,253,85,255,255,255,85,255,255,255,0,0,0,16,16,16,32,32,32,53,53,53,69,69,69,85,85,85,101,101,101,117,117,117,138,138,138,154,154,154,170,170,170,186,186,186,202,202,202,223,223,223,239,239,239,255,255,255,0,4,255,65,4,255,130,3,255,190,2,255,253,0,255,254,0,190,255,0,130,255,0,65,255,0,8,255,65,5,255,130,0,255,190,0,255,255,0,190,255,0,130,255,0,65,255,1,36,255,0,34,255,66,29,255,130,18,255,190,0,255,255,0,190,255,1,130,255,0,65,255,130,130,255,158,130,255,190,130,255,223,130,255,253,130,255,254,130,223,255,130,190,255,130,158,255,130,130,255,158,130,255,190,130,255,223,130,255,255,130,223,255,130,190,255,130,158,255,130,130,255,130,130,255,158,130,255,190,130,255,223,130,255,255,130,223,255,130,190,255,130,158,255,186,186,255,202,186,255,223,186,255,239,186,255,254,186,255,254,186,239,255,186,223,255,186,202,255,186,186,255,202,186,255,223,186,255,239,186,255,255,186,239,255,186,223,255,186,202,255,187,186,255,186,186,255,202,186,255,223,186,255,239,186,255,255,186,239,255,186,223,255,186,202,255,1,1,113,28,1,113,57,1,113,85,0,113,113,0,113,113,0,85,113,0,57,113,0,28,113,0,1,113,28,1,113,57,0,113,85,0,113,113,0,85,113,0,57,113,0,28,113,0,9,113,0,9,113,28,6,113,57,3,113,85,0,113,113,0,85,113,0,57,113,0,28,113,57,57,113,69,57,113,85,57,113,97,57,113,113,57,113,113,57,97,113,57,85,113,57,69,113,57,57,113,69,57,113,85,57,113,97,57,113,113,57,97,113,57,85,113,57,69,113,58,57,113,57,57,113,69,57,113,85,57,113,97,57,113,113,57,97,113,57,85,113,57,69,114,81,81,113,89,81,113,97,81,113,105,81,113,113,81,113,113,81,105,113,81,97,113,81,89,113,81,81,113,89,81,113,97,81,113,105,81,113,113,81,105,113,81,97,113,81,89,113,81,81,113,81,81,113,90,81,113,97,81,113,105,81,113,113,81,105,113,81,97,113,81,89,113,0,0,66,17,0,65,32,0,65,49,0,65,65,0,65,65,0,50,65,0,32,65,0,16,65,0,0,65,16,0,65,32,0,65,49,0,65,65,0,49,65,0,32,65,0,16,65,0,3,65,0,3,65,16,2,65,32,1,65,49,0,65,65,0,49,65,0,32,65,0,16,65,32,32,65,40,32,65,49,32,65,57,32,65,65,32,65,65,32,57,65,32,49,65,32,40,65,32,32,65,40,32,65,49,32,65,57,33,65,65,32,57,65,32,49,65,32,40,65,32,32,65,32,32,65,40,32,65,49,32,65,57,32,65,65,32,57,65,32,49,65,32,40,65,45,45,65,49,45,65,53,45,65,61,45,65,65,45,65,65,45,61,65,45,53,65,45,49,65,45,45,65,49,45,65,53,45,65,61,45,65,65,45,61,65,45,53,65,45,49,65,45,45,65,45,45,65,49,45,65,53,45,65,61,45,65,65,45,61,65,45,53,65,45,49,65,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 };
 
-int[] colortab = new int[256*4];
-int[] sparsepixels = new int[256*4];
+static int framesize = 256*4*2; 
+
+int[] colortab = new int[framesize];
+int[] sparsepixels = new int[framesize];
 
 int xs = 0;
 int sqs = 8;
@@ -59,7 +61,7 @@ color getVGAColor(int i) {
 int getClosestVGAColorIndex(color c) {
   float dist = 100000.0f;
   int currentBest = 0;
-  for (int i = 0; i < 255; i++) {
+  for (int i = 0; i <= 255; i++) {
     color compColor = getVGAColor(i);
     float distToVga = colorDistance(c, compColor);
     
@@ -77,10 +79,43 @@ color getClosestVGAColor(color c) {
   return getVGAColor(getClosestVGAColorIndex(c));
 }
 
+
+int arearandomness(int x, int y) {
+  float sum = 0.0f;
+  
+  float pr=0.0f,pg=0.0f,pb=0.0f;
+  
+  int samples = 0;
+  for (int yy = y-sqs;yy<y+sqs;yy++) {
+    for (int xx = x-sqs;xx<x+sqs;xx++) {
+      color c = source.get(x,y);
+      float r = red(c);
+      float g = green(c);
+      float b = blue(c);
+      
+      float rdiff = abs(r-pr); 
+      float gdiff = abs(g-pg); 
+      float bdiff = abs(b-pb); 
+      
+      float sdiff = (rdiff+gdiff+bdiff) / 3.0f;
+      
+      sum += sdiff;
+      samples++;
+      pr = r;
+      pg = g;
+      pb = b;
+    }
+  }
+  
+  int ret = int((sum / (float)(samples))*226.0f);
+  
+  return 255-(ret&255);
+}
+
 void sampleSparse() {
   int x,y,i = 0;
 
-  for (int ii=0;ii<256*4;ii++) {
+  for (int ii=0;ii<framesize;ii++) {
     colortab[ii] = 0;
     sparsepixels[ii] = 0;
   }
@@ -92,7 +127,7 @@ void sampleSparse() {
   for (y = 0; y < 256; y+=sqs) {
     for (x = 0; x < 256; x+=sqs) {
       
-      IntList il = IntList.fromRange(0, 255);
+      IntList il = IntList.fromRange(0,1+arearandomness(x,y));
       il.shuffle(this);
 
       int i1 = il.get(0);
@@ -126,11 +161,12 @@ void sampleFilled() {
       int x2 = i1%sqs;
       int y2 = i1/sqs;
 
-      for(int y1 = 0; y1 < sqs;y1+=1) {
-        for(int x1 = 0; x1 < sqs;x1+=1) {
-          filled.set(x+x1+x2,y+y1+y2,p1);
-        }
-      }
+      filled.set(x+x2,y+0+y2,p1);
+      filled.set(x+x2,y+1+y2,p1);
+      filled.set(x+x2,y+3+y2,p1);
+      filled.set(x+x2,y+4+y2,p1);
+      filled.set(x+x2,y+6+y2,p1);
+      filled.set(x+x2,y+7+y2,p1);
 
       i++;
     }
@@ -183,7 +219,8 @@ void setup() {
 
   frameRate(24);
   
-  viteo = new Movie(this, "boux.mp4");
+  viteo = new Movie(this, "bad3d.mp4");
+  viteo.speed(4.0);
   viteo.play();
 }
 
@@ -191,15 +228,11 @@ void setup() {
 int xsd = 0;
 int ff = 0;
 
-void movieEvent(Movie m) {
-  m.read();
-}
-
 void dumpFrameData() {
-  byte[] pix = new byte[256*4];
-  byte[] cols = new byte[256*4];
+  byte[] pix = new byte[framesize];
+  byte[] cols = new byte[framesize];
   
-  for (int i=0;i<256*4;i++) {
+  for (int i=0;i<framesize;i++) {
     pix[i] = (byte)sparsepixels[i];
     cols[i] = (byte)colortab[i];
   }
@@ -209,12 +242,16 @@ void dumpFrameData() {
 }
 
 void draw() {
-
+  if (viteo.available()) {
+    viteo.read();
+  } else {
+    return;
+  }
   source.beginDraw();
   source.pushMatrix();
-  source.scale(0.5);
   source.background(0);
-  source.image(viteo,-390,-150);
+  source.scale(0.4,0.5);
+  source.image(viteo,0,8);
   source.popMatrix();
   source.endDraw();
   
@@ -235,9 +272,9 @@ void draw() {
   image(filled,0,0,256,256);
 
   ff++;
-  if (ff < 340) {
+  if (ff > 0 & ff < 24024) {
     dumpFrameData();
-  } else {
+  } else if (ff >= 24024){
     stop();
   }
 }
