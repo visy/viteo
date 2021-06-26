@@ -4,7 +4,7 @@
 #include <dos.h>
 #include <mem.h>
 #include <i86.h>
-
+#include "midasdll.h"
 
 typedef struct
 {
@@ -112,17 +112,32 @@ void quit(char *message)
         exit(0);
 }
 
+
+MIDASmodule module;                     /* Der Module */
+MIDASmodulePlayHandle playHandle;       /* Das Playing Handle */
+
+char *moduleName = "test.s3m";
+unsigned        position;               /* Current position */
+unsigned        pattern;                /* Current pattern number */
+unsigned        row;                    /* Current row number */
+int             syncInfo;               /* Music synchronization info */
+
+
 // video data buffers   
 byte *bufferpix;
 byte *buffercol;
 
-int frame = 0;
+unsigned long frame = 0;
 
-long pixi = 0;
-long coli = 0;
+unsigned long pixi = 0;
+unsigned long coli = 0;
+
+unsigned long plast = 0;
+unsigned long clast = 0;
 
 byte modtab[256] = {0};
 byte divtab[256] = {0};
+int shift8tab[256] = {0};
 
 byte a,b,c;
 
@@ -132,77 +147,145 @@ int randr = 0;
 
 void init_rng(byte s1,byte s2,byte s3) //Can also be used to seed the rng with more entropy during use.
 {
-	//XOR new entropy into key state
-	a ^=s1;
-	b ^=s2;
-	c ^=s3;
+        //XOR new entropy into key state
+        a ^=s1;
+        b ^=s2;
+        c ^=s3;
 
-	rx++;
-	a = (a^c^rx);
-	b = (b+a);
-	c = (c+(b>>1)^a);
+        rx++;
+        a = (a^c^rx);
+        b = (b+a);
+        c = (c+(b>>1)^a);
 }
 
 byte randomize()
 {
-	rx++;               //x is incremented every round and is not affected by any other variable
-	a = (a^c^rx);       //note the mix of addition and XOR
-	b = (b+a);         //And the use of very few instructions
-	c = (c+(b>>1)^a);  //the right shift is to ensure that high-order bits from b can affect  
-	return(c);          //low order bits of other variables
+        rx++;               //x is incremented every round and is not affected by any other variable
+        a = (a^c^rx);       //note the mix of addition and XOR
+        b = (b+a);         //And the use of very few instructions
+        c = (c+(b>>1)^a);  //the right shift is to ensure that high-order bits from b can affect  
+        return(c);          //low order bits of other variables
 }
+
+long prevframe, startframe;
 
 void sampleVideo() 
 {
-        int x=0,y=0,x1=0,y1=0,skips=0,x2=0,y2=0;
-        byte runcolor = 0, p1 = 0;
+        int x=0,y=0,x1=0,y1=0,x2=0,y2=0,skips =0,x3,yy;
+        byte runcolor = 0, p1 = 0, i1;
+        unsigned long pi,co;
+
+        if (prevframe == frame) return;
+
+        startframe = frame;
+
+        pi = pixi;
+        co = coli;
 
         for(y=0;y<256;y+=8) {
+        		if (frame > startframe) { return; }
                 for(x=0;x<256;x+=8) {
-                        byte i1 = bufferpix[pixi];
+                        i1 = bufferpix[pi];
 
-					    if (i1 == 255) {
-					    	pixi++;
-					    	skips = bufferpix[pixi];
-					        runcolor = buffercol[coli];
-					    }
-
-					    if (skips > 0) {
-					    	i1 = randoms[randr++];
-					    	if (randr > 64000) randr = 0;
-					    	p1 = runcolor;
-					    }
-
-					    if (skips == 0) {
-					    	p1 = buffercol[coli];
-					    	coli++;
-					    	pixi++;
-					    }
-
-					    if (skips > 0) {
-					    	skips--;
-
-					    	if (skips == 0) {
-					    		coli++;
-					    		pixi++;
-					    	}
-					    }
+                        p1 = buffercol[co];
+                        co++;
+                        pi++;
 
                         x2 = modtab[i1];
                         y2 = divtab[i1];
 
-                        VGA[((y+y1+y2)<<8)+x+x2] = p1;
-                        VGA[((y+y1+y2+1)<<8)+x+x2] = p1;
-                        VGA[((y+y1+y2+3)<<8)+x+x2] = p1;
-                        VGA[((y+y1+y2+4)<<8)+x+x2] = p1;
-                        VGA[((y+y1+y2+6)<<8)+x+x2] = p1;
-                        VGA[((y+y1+y2+7)<<8)+x+x2] = p1;
+                        x3 = x+x2;
+                        yy = y+y2;
 
+                        VGA[((yy)<<8)+x3] = p1;
+                        VGA[((yy+1)<<8)+x3] = p1;
+                        VGA[((yy+3)<<8)+x3] = p1;
+                        VGA[((yy+4)<<8)+x3] = p1;
+                        VGA[((yy+6)<<8)+x3] = p1;
+                        VGA[((yy+7)<<8)+x3] = p1;
                 }
         }
 
-        if (frame > 340) { frame = 0; pixi = 0; coli = 0; }
+        prevframe = frame;
 }
+
+int fc = 0;
+
+void MIDAS_CALL prevr(void)
+{
+
+	fc++;
+	if (fc > 1) {
+
+		if (prevframe > frame) {
+			int prevdiff = prevframe-frame;
+			pixi=plast+1024*prevdiff;
+			coli=clast+1024*prevdiff;
+
+		    frame+=prevdiff;
+		    if (frame > 2180) { frame = 0; pixi = 0; coli = 0; plast = 0; clast = 0; prevframe = 0; }
+		} else {
+			frame++;
+		    pixi=plast+1024;
+		    coli=clast+1024;
+		}
+
+	    plast = pixi;
+	    clast = coli;
+
+		fc=0;		
+	}
+
+}
+
+void MIDASerror(void)
+{
+    printf("MIDAS error: %s\n", MIDASgetErrorMessage(MIDASgetLastError()));
+    MIDASclose();
+    exit(EXIT_FAILURE);
+}
+
+
+
+void MIDAS_CALL UpdateInfo(void)
+{
+    /* MIDAS_CALL is cdecl for Watcom, empty for DJGPP. Helps calling this
+       from assembler, otherwise unnecessary */
+    
+    static MIDASplayStatus status;
+
+    /* Get playback status: */
+    if ( !MIDASgetPlayStatus(playHandle, &status) )
+        MIDASerror();
+
+    /* Store interesting information in easy-to-access variables: */
+    position = status.position;
+    pattern = status.pattern;
+    row = status.row;
+    syncInfo = status.syncInfo;
+}
+
+
+void MIDAS_CALL SyncCallback(unsigned syncNum, unsigned position, unsigned row)
+{
+    /* Prevent warnings: */
+    position = position;
+    row = row;
+
+    /* Check if the infobyte is interesting - do something only when command
+       "W42" is encountered: */
+    if ( syncNum == 0x42 )
+    {
+        /* Yeah, yeah, flash the border! */
+        // border = 15;
+        /* The timer will set the border color */
+    }
+
+
+
+
+}
+
 
 int main(int argc, char *argv[]) 
 {
@@ -217,13 +300,13 @@ int main(int argc, char *argv[])
         for (ii=0;ii<256;ii++) {
                 modtab[ii] = (byte)(ii % 8);
                 divtab[ii] = (byte)(ii / 8);
+                shift8tab[ii] = (int)(ii<<8);
         }
 
-
-		init_rng(1,2,3);
+        init_rng(1,2,3);
 
         for (ii=0;ii<64000;ii++) {
-        	randoms[ii] = randomize()>>1;
+                randoms[ii] = randomize()>>1;
         }
         
         vfile = fopen("vpix.dat","rb");
@@ -261,18 +344,73 @@ int main(int argc, char *argv[])
         fclose(vfile);
         fclose(cfile);
 
+        MIDASstartup();
+
+            if (!MIDASdetectSoundCard())
+            {
+                if ( !MIDASconfig() )
+                {
+                    if ( MIDASgetLastError() )
+                    {
+                        MIDASerror();
+                    }
+                    else
+                    {
+                        printf("User exit!\n");
+                        return 1;
+                    }
+                }
+            }
+
+		if ( !MIDASinit() )
+		    MIDASerror();
+
+		if ( (module = MIDASloadModule(moduleName)) == NULL )
+		MIDASerror();
+
+
+       if ( !MIDASsetTimerCallbacks(70000, TRUE, &prevr, NULL, NULL) )
+            MIDASerror();
+
+        /* Set the music synchronization callback function: */
+        if ( !MIDASsetMusicSyncCallback(playHandle, &SyncCallback) )
+            MIDASerror();
+
         printf("Starting...\n");
         set_mode(0x13);
         set_mode_q();
 
+        /* Start playing the module: */
+        if ( (playHandle = MIDASplayModule(module, TRUE)) == 0 )
+            MIDASerror();
+
+	    MIDASstartBackgroundPlay( 0 );
+
         while(!kbhit()) {
-                sampleVideo();
+            sampleVideo();
+            UpdateInfo();
 
-            while ((inp(INPUT_STATUS_1) & VRETRACE));
-            while (!(inp(INPUT_STATUS_1) & VRETRACE));
-
-                frame++;
         }
+
+            /* Remove music sync callback: */
+            if ( !MIDASsetMusicSyncCallback(playHandle, NULL) )
+                MIDASerror();
+            
+            /* Stop playing module: */
+            if ( !MIDASstopModule(playHandle) )
+                MIDASerror();
+
+            /* Deallocate the module: */
+            if ( !MIDASfreeModule(module) )
+                MIDASerror();
+
+            /* Remove timer callback: */
+            if ( !MIDASremoveTimerCallbacks() )
+                MIDASerror();
+
+            /* And close MIDAS: */
+            if ( !MIDASclose() )
+                MIDASerror();
 
         quit("Have a nice day.");
         return 0;
