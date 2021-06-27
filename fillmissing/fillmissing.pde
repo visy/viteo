@@ -299,16 +299,32 @@ void setup() {
   createFile("vpixc.dat");
   createFile("vcolc.dat");
 
-  frameRate(300);
+  PImage pal = loadImage("weirdrockpal.png");
+/*
+  int i = 0;
+  for (int y=0;y<16;y++) {
+    for (int x=0;x<16;x++) {
+      color c = pal.get(x,y);
+      
+      vgacolors_RGB[i+0] = int(red(c));
+      vgacolors_RGB[i+1] = int(green(c));
+      vgacolors_RGB[i+2] = int(blue(c));
+
+      i+=3;
+    }
+    
+  }
+*/
+  frameRate(1000);
 
   //String[] cameras = Capture.list();
 
   //viteo = new Capture(this, 256, 256);
   //viteo.start();
   
-  viteo = new Movie(this,"test.mp4");
+  viteo = new Movie(this,"weirdrock.mp4");
   viteo.play();
-  viteo.speed(0.33);
+  viteo.speed(0.5);
   viteo.volume(0);
 }
 
@@ -365,15 +381,15 @@ float ftime = -1;
 void draw() {
   if (vid_buffer == 1) {
   
-    if (viteo.time() > ftime) {
+    if (viteo.time() > ftime && viteo.available()) {
       viteo.read();
       vid_f++;
       
       source.beginDraw();
       source.pushMatrix();
       source.background(0, 0, 0);
-      source.scale(0.34,0.52);
-      source.image(viteo, 0, 0);
+      source.scale(0.16,0.32);
+      source.image(viteo, 0, -100);
       source.popMatrix();
       frameList.add(source.get());
       source.endDraw();
@@ -384,7 +400,7 @@ void draw() {
   
     float md = viteo.duration();
     float mt = viteo.time();
-    if (mt >= md/16.0-0.1) {
+    if (mt >= md-0.2) {
       vid_buffer = 0;
       framecount = vid_f;
       frameList.add(source.get());
