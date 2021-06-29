@@ -30,7 +30,7 @@ PGraphics filled;
 
 PImage test;
 
-Movie viteo;
+//Movie viteo;
 //Capture viteo;
 
 int[] vgacolors_RGB = {
@@ -141,6 +141,7 @@ void sampleSparse() {
   color prevp1 = color(0, 0, 0);
   int skippedtotal = 0;
   int i1 = 0;
+  source.loadPixels();
   for (y = 0; y < 256; y+=sqs) {
     for (x = 0; x < 256; x+=sqs) {
       IntList il = IntList.fromRange(0, 253);
@@ -149,7 +150,10 @@ void sampleSparse() {
       int i2 = i1;
       i1 = il.get(0);
 
-      color p1 = source.get((x+xs + i1 % sqs)&255, (y+xs + i1 / sqs)&255); 
+      int sx = (x+xs + i1 % sqs)&255;
+      int sy = (y+xs + i1 / sqs)&255; 
+
+      color p1 = source.pixels[sy*256+sx]; 
 
       int c = getClosestVGAColorIndex(p1);      
       color vgacol = getVGAColor(c);
@@ -276,10 +280,10 @@ void createFile(String filename) {
 int framecount = 2000;
 
 void setup() {
-  size(256, 256);
+  size(256, 256, P2D);
 
   prevsource = createGraphics(256, 256);
-  source = createGraphics(256, 256);
+  source = createGraphics(256, 256,P3D);
   sparse = createGraphics(256, 256);
   filled = createGraphics(256, 256);
 
@@ -298,9 +302,9 @@ void setup() {
   createFile("vcol.dat");
   createFile("vpixc.dat");
   createFile("vcolc.dat");
-
-  PImage pal = loadImage("weirdrockpal.png");
 /*
+  PImage pal = loadImage("rtxpal.png");
+
   int i = 0;
   for (int y=0;y<16;y++) {
     for (int x=0;x<16;x++) {
@@ -315,22 +319,24 @@ void setup() {
     
   }
 */
-  frameRate(1000);
+  frameRate(24);
 
   //String[] cameras = Capture.list();
 
   //viteo = new Capture(this, 256, 256);
   //viteo.start();
   
-  viteo = new Movie(this,"weirdrock.mp4");
-  viteo.play();
-  viteo.speed(0.5);
-  viteo.volume(0);
+  //viteo = new Movie(this,"boux.mp4");
+  //viteo.play();
+  //viteo.speed(4.0);
+  //viteo.volume(0);
 }
 
 
 int xsd = 0;
-int ff = 0;
+float fs = 0.2;
+float ff = 0.0;
+int frames = 0;
 
 byte[] pix = new byte[truepixsize];
 byte[] cols = new byte[truecolsize];
@@ -367,11 +373,18 @@ void dumpFrameData() {
   fwrite(dataPath("vcol.dat"), cols, true);
 
 
-  println("frame " + ff + " wrote " + truepixsize + " of pixel, " + truecolsize + " of color data");
+  println("frame " + frames + " wrote " + truepixsize + " of pixel, " + truecolsize + " of color data");
+  frames++;
 }
 
 int delayframe = 2;
 
+
+int looplist[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int loopindex = 0;
+
+
+// 0 = convert, 1 = pre-cache, 2 = loop edit
 int vid_buffer = 1;
 int vid_f = 0;
 ArrayList<PImage> frameList = new ArrayList<PImage>();
@@ -380,48 +393,29 @@ float ftime = -1;
 
 void draw() {
   if (vid_buffer == 1) {
-  
-    if (viteo.time() > ftime && viteo.available()) {
-      viteo.read();
-      vid_f++;
-      
-      source.beginDraw();
-      source.pushMatrix();
-      source.background(0, 0, 0);
-      source.scale(0.16,0.32);
-      source.image(viteo, 0, -100);
-      source.popMatrix();
-      frameList.add(source.get());
-      source.endDraw();
-      ftime = viteo.time();
-    } else {
-      return;
-    }
-  
-    float md = viteo.duration();
-    float mt = viteo.time();
-    if (mt >= md-0.2) {
-      vid_buffer = 0;
-      framecount = vid_f;
-      frameList.add(source.get());
-      background(0);
-      return;
-    }
+
+    int fc = 182;
     
-    fill(255);
-    rect(0,112,(mt/md)*width,32);
-    
+    for (vid_f = 0; vid_f < fc; vid_f++) {
+      PImage p = loadImage("c:\\tmp\\esa18000\\" + nf(vid_f,4)+".png");
+      frameList.add(p);
+      fill(255);
+      rect(0,112,(vid_f/fc)*width,32);
+
+    }  
+    framecount = fc;
+    vid_buffer = 2;
+    background(0);
     return;
-  
+
   }
 
   source.beginDraw();
-  source.pushMatrix();
-  source.background(0, 0, 0);
-  source.image(frameList.get(ff), 0, 0);
-  source.popMatrix();
-  source.endDraw();
 
+  source.background(0, 0, 0);
+  source.image(frameList.get(int(ff)), 0, 0);
+  source.endDraw();
+/*
     source.loadPixels();
     int w = source.width;
     int h = source.height;
@@ -480,7 +474,7 @@ void draw() {
     }
   
     source.updatePixels();
-
+*/
 
   sparse.beginDraw();
   sparse.background(0);
@@ -492,15 +486,12 @@ void draw() {
     dumpFrameData();
   }
 
-  if (ff == framecount) {
-    fwrite(dataPath("vpixc.dat"), pixdata, true);
-    fwrite(dataPath("vcolc.dat"), coldata, true);
+  if (delayframe == 0)
+    ff+=fs;
 
+  if (ff >= framecount) {
     exit();
   }
-
-  if (delayframe == 0)
-  ff++;
 
   filled.beginDraw();
   filled.background(0, 0);

@@ -116,7 +116,7 @@ void quit(char *message)
 MIDASmodule module;                     /* Der Module */
 MIDASmodulePlayHandle playHandle;       /* Das Playing Handle */
 
-char *moduleName = "test.s3m";
+char *moduleName = "music.xm";
 unsigned        position;               /* Current position */
 unsigned        pattern;                /* Current pattern number */
 unsigned        row;                    /* Current row number */
@@ -144,6 +144,17 @@ byte a,b,c;
 byte randoms[64000] = {0};
 int rx = 0;
 int randr = 0;
+
+int loopdata[16] = {
+	0,0,
+	1,
+	60,
+	61,
+	120,
+	122,
+	180,
+	65535,65535
+};
 
 void init_rng(byte s1,byte s2,byte s3) //Can also be used to seed the rng with more entropy during use.
 {
@@ -183,7 +194,7 @@ void sampleVideo()
         co = coli;
 
         for(y=0;y<256;y+=8) {
-        		if (frame > startframe) { return; }
+                        if (frame > startframe) { return; }
                 for(x=0;x<256;x+=8) {
                         i1 = bufferpix[pi];
 
@@ -199,10 +210,12 @@ void sampleVideo()
 
                         VGA[((yy)<<8)+x3] = p1;
                         VGA[((yy+1)<<8)+x3] = p1;
+
                         VGA[((yy+3)<<8)+x3] = p1;
                         VGA[((yy+4)<<8)+x3] = p1;
-                        VGA[((yy+6)<<8)+x3] = p1;
+
                         VGA[((yy+7)<<8)+x3] = p1;
+                        VGA[((yy+8)<<8)+x3] = p1;
                 }
         }
 
@@ -210,32 +223,49 @@ void sampleVideo()
 }
 
 int fc = 0;
+int loopindex = 0;
+int loopspeed = 5;
+int loopcount = 0;
+int loopbreak = 0;
+
+
+unsigned prevSyncNum = 0xFF;
 
 void MIDAS_CALL prevr(void)
 {
+	if (prevframe > frame) {
+		int prevdiff = prevframe-frame;
+		pixi=plast+1024*prevdiff;
+		coli=clast+1024*prevdiff;
 
-	fc++;
-	if (fc > 1) {
-
-		if (prevframe > frame) {
-			int prevdiff = prevframe-frame;
-			pixi=plast+1024*prevdiff;
-			coli=clast+1024*prevdiff;
-
-		    frame+=prevdiff;
-		    if (frame > 2180) { frame = 0; pixi = 0; coli = 0; plast = 0; clast = 0; prevframe = 0; }
-		} else {
-			frame++;
-		    pixi=plast+1024;
-		    coli=clast+1024;
-		}
-
-	    plast = pixi;
-	    clast = coli;
-
-		fc=0;		
+		frame+=prevdiff;
+	} else {
+		frame++;
+		pixi=plast+1024;
+		coli=clast+1024;
 	}
 
+	if (frame/loopspeed >= loopdata[loopindex+1]) {
+		loopcount++;
+		frame = loopdata[loopindex]*loopspeed;
+		pixi = frame*1024;
+		coli = frame*1024;
+	}
+
+	if (loopbreak == 1) {
+		loopindex = ((randoms[prevSyncNum] % 3) *2) + 2;
+
+		loopcount = 0;
+		loopbreak = 0;
+		frame = loopdata[loopindex]*loopspeed;
+		prevframe = frame;
+		pixi = frame*1024;
+		coli = frame*1024;
+		memset(VGA,0,64000);
+	}
+
+	plast = pixi;
+	clast = coli;
 }
 
 void MIDASerror(void)
@@ -266,24 +296,18 @@ void MIDAS_CALL UpdateInfo(void)
 }
 
 
+int quitti = 0;
+
 void MIDAS_CALL SyncCallback(unsigned syncNum, unsigned position, unsigned row)
 {
     /* Prevent warnings: */
     position = position;
     row = row;
 
-    /* Check if the infobyte is interesting - do something only when command
-       "W42" is encountered: */
-    if ( syncNum == 0x42 )
-    {
-        /* Yeah, yeah, flash the border! */
-        // border = 15;
-        /* The timer will set the border color */
+    if (syncNum != prevSyncNum) {
+    	loopbreak = 1;
+    	prevSyncNum = syncNum;
     }
-
-
-
-
 }
 
 
@@ -362,18 +386,14 @@ int main(int argc, char *argv[])
                 }
             }
 
-		if ( !MIDASinit() )
-		    MIDASerror();
+                if ( !MIDASinit() )
+                    MIDASerror();
 
-		if ( (module = MIDASloadModule(moduleName)) == NULL )
-		MIDASerror();
+                if ( (module = MIDASloadModule(moduleName)) == NULL )
+                MIDASerror();
 
 
-       if ( !MIDASsetTimerCallbacks(70000, TRUE, &prevr, NULL, NULL) )
-            MIDASerror();
-
-        /* Set the music synchronization callback function: */
-        if ( !MIDASsetMusicSyncCallback(playHandle, &SyncCallback) )
+       if ( !MIDASsetTimerCallbacks(70000, FALSE, &prevr, NULL, NULL) )
             MIDASerror();
 
         printf("Starting...\n");
@@ -384,12 +404,17 @@ int main(int argc, char *argv[])
         if ( (playHandle = MIDASplayModule(module, TRUE)) == 0 )
             MIDASerror();
 
-	    MIDASstartBackgroundPlay( 0 );
+            MIDASstartBackgroundPlay( 0 );
+
+        /* Set the music synchronization callback function: */
+        if ( !MIDASsetMusicSyncCallback(playHandle, &SyncCallback) )
+            MIDASerror();
 
         while(!kbhit()) {
             sampleVideo();
             UpdateInfo();
 
+            if (quitti == 1) break;
         }
 
             /* Remove music sync callback: */
