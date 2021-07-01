@@ -17,6 +17,7 @@ typedef Register *RegisterPtr;
 
 #include "mode1.h"
 #include "mode2.h"
+#include "key.h"
 
 typedef unsigned char  byte;
 typedef unsigned short word;
@@ -128,6 +129,7 @@ byte *bufferpix;
 byte *buffercol;
 
 unsigned long frame = 0;
+unsigned long tick = 0;
 
 unsigned long pixi = 0;
 unsigned long coli = 0;
@@ -146,9 +148,9 @@ int rx = 0;
 int randr = 0;
 
 int loopdata[16] = {
-	0,0,
-	1,
-	60,
+	0,359,
+	0,
+	359,
 	61,
 	120,
 	122,
@@ -183,18 +185,19 @@ long prevframe, startframe;
 void sampleVideo() 
 {
         int x=0,y=0,x1=0,y1=0,x2=0,y2=0,skips =0,x3,yy;
-        byte runcolor = 0, p1 = 0, i1;
+        byte runcolor = 0, p1 = 0, i1,ra;
         unsigned long pi,co;
 
-        if (prevframe == frame) return;
+        //if (prevframe == frame) return;
 
         startframe = frame;
 
         pi = pixi;
         co = coli;
 
+        ra = randoms[tick]>>4;
         for(y=0;y<256;y+=8) {
-                        if (frame > startframe) { return; }
+                if (frame > startframe) { return; }
                 for(x=0;x<256;x+=8) {
                         i1 = bufferpix[pi];
 
@@ -227,41 +230,54 @@ int loopindex = 0;
 int loopspeed = 5;
 int loopcount = 0;
 int loopbreak = 0;
+int looper = 1;
+int ps = 4;
 
+// for m in bpy.context.scene.timeline_markers: print(m.frame)
 
 unsigned prevSyncNum = 0xFF;
 
 void MIDAS_CALL prevr(void)
 {
+	tick++;
+
 	if (prevframe > frame) {
 		int prevdiff = prevframe-frame;
-		pixi=plast+1024*prevdiff;
-		coli=clast+1024*prevdiff;
+		pixi=plast+1024*prevdiff*ps;
+		coli=clast+1024*prevdiff*ps;
 
-		frame+=prevdiff;
+		frame+=prevdiff*ps;
 	} else {
-		frame++;
-		pixi=plast+1024;
-		coli=clast+1024;
+		frame+=ps;
+		pixi=plast+1024*ps;
+		coli=clast+1024*ps;
 	}
 
-	if (frame/loopspeed >= loopdata[loopindex+1]) {
-		loopcount++;
-		frame = loopdata[loopindex]*loopspeed;
-		pixi = frame*1024;
-		coli = frame*1024;
-	}
+	if (looper == 1) {
 
-	if (loopbreak == 1) {
-		loopindex = ((randoms[prevSyncNum] % 3) *2) + 2;
+		if (frame/loopspeed >= loopdata[loopindex+1] || frame/loopspeed < loopdata[loopindex+0]) {
+			loopcount++;
 
-		loopcount = 0;
-		loopbreak = 0;
-		frame = loopdata[loopindex]*loopspeed;
-		prevframe = frame;
-		pixi = frame*1024;
-		coli = frame*1024;
-		memset(VGA,0,64000);
+			if (ps < 0)
+				frame = loopdata[loopindex+1]*loopspeed;
+			else
+				frame = loopdata[loopindex]*loopspeed;
+
+			pixi = frame*1024;
+			coli = frame*1024;
+		}
+
+		if (loopbreak == 2) {
+			//loopindex = ((randoms[prevSyncNum] % 3) *2) + 2;
+
+			loopcount = 0;
+			loopbreak = 0;
+			frame = loopdata[loopindex]*loopspeed;
+			prevframe = frame;
+			pixi = frame*1024;
+			coli = frame*1024;
+			memset(VGA,0,64000);
+		}
 	}
 
 	plast = pixi;
@@ -318,6 +334,7 @@ int main(int argc, char *argv[])
         FILE *cfile;
         long lsize;
         size_t result;
+        unsigned char key;
 
         char ch;
 
@@ -410,11 +427,15 @@ int main(int argc, char *argv[])
         if ( !MIDASsetMusicSyncCallback(playHandle, &SyncCallback) )
             MIDASerror();
 
-        while(!kbhit()) {
+        installKeyboardHandler();
+
+        while(quitti == 0) {
             sampleVideo();
             UpdateInfo();
-
-            if (quitti == 1) break;
+            if (checkKey(KEY_UPARROW)) { ps+=2; if (ps > 16) { ps = 16; } }
+            else if (checkKey(KEY_DOWNARROW)) { ps-=2; if (ps < -16) { ps = -16; } }
+            else if (checkKey(KEY_ESC)) quitti = 1;
+            clearKeys();
         }
 
             /* Remove music sync callback: */

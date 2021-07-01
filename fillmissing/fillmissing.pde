@@ -67,7 +67,8 @@ int palrot = 0;
 int getClosestVGAColorIndex(color c) {
   float dist = 1000000.0f;
   int currentBest = 0;
-  for (int i = 0; i <= 253; i++) {
+  
+  for (int i = 0; i < 253; i++) {
     color compColor = getVGAColor(i);
     float distToVga = colorDistance(c, compColor);
 
@@ -303,7 +304,7 @@ void setup() {
   createFile("vpixc.dat");
   createFile("vcolc.dat");
 /*
-  PImage pal = loadImage("rtxpal.png");
+  PImage pal = loadImage("pal.png");
 
   int i = 0;
   for (int y=0;y<16;y++) {
@@ -319,7 +320,7 @@ void setup() {
     
   }
 */
-  frameRate(24);
+  frameRate(900);
 
   //String[] cameras = Capture.list();
 
@@ -394,10 +395,10 @@ float ftime = -1;
 void draw() {
   if (vid_buffer == 1) {
 
-    int fc = 182;
+    int fc = 360*5;
     
     for (vid_f = 0; vid_f < fc; vid_f++) {
-      PImage p = loadImage("c:\\tmp\\esa18000\\" + nf(vid_f,4)+".png");
+      PImage p = loadImage("c:\\tmp\\looper1\\" + nf(vid_f,4)+".png");
       frameList.add(p);
       fill(255);
       rect(0,112,(vid_f/fc)*width,32);
@@ -415,7 +416,7 @@ void draw() {
   source.background(0, 0, 0);
   source.image(frameList.get(int(ff)), 0, 0);
   source.endDraw();
-/*
+
     source.loadPixels();
     int w = source.width;
     int h = source.height;
@@ -474,7 +475,7 @@ void draw() {
     }
   
     source.updatePixels();
-*/
+
 
   sparse.beginDraw();
   sparse.background(0);
